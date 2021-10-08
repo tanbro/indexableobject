@@ -1,2 +1,3 @@
-# indexableobject
-IndexableObject can make an object with both dictionary and attribute style access to it's data member.
+# IndexableObject
+
+IndexableObject enables an object with both dictionary and attribute style accessing to it's data member.
