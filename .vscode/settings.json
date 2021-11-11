@@ -1,4 +1,10 @@
 {
     "jupyter.notebookFileRoot": "${workspaceFolder}",
-    "python.testing.unittestEnabled": true
+    "python.testing.unittestEnabled": true,
+    "markdownlint.config": {
+        "MD028": false,
+        "MD025": {
+            "front_matter_title": ""
+        }
+    }
 }

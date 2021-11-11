@@ -1,20 +1,23 @@
 import re
 from collections import deque
 from itertools import chain, count
-from typing import Any, Hashable, Iterator, Mapping, Sequence, Union
+from typing import Any, Hashable, Iterable, Iterator, Mapping, Union
 
 __all__ = ['IndexableObject', 'to_dict', 'update', 'merge', 'from_dict']
 
-DEFAULT_ARGUMENT_VALUE = object()
-INDEXABLE_SCALAR_TYPES = str, bytes, bytearray, memoryview
-INTERNAL_NAME_PATTERN = re.compile(r'_{2}\S+_{2}')
+
+DEFAULT_VALUE = object()
+INTERNAL_PATTERN = re.compile(r'_{2}\S+_{2}')
+SCALAR_SEQUENCE_TYPES = str, bytes, bytearray, memoryview
 
 
 class IndexableObject:
     """
     IndexableObject can make an object with both dictionary and attribute style access to it's data member.
     It can be used in `RestrictedPython <http://restrictedpython.readthedocs.io/>`_
+
     eg::
+
         >>> obj = IndexableObject()
         >>> obj.a = 'this is a'
         >>> obj['a']
@@ -37,7 +40,7 @@ class IndexableObject:
     """
 
     def __init__(self, initialdata: Union['IndexableObject', Mapping] = None):
-        setattr(self, '__data__', dict())
+        setattr(self, '__x_attrs__', dict())
 
         if isinstance(initialdata, Mapping):
             for k, v in initialdata.items():
@@ -47,47 +50,47 @@ class IndexableObject:
                 self.__setitem__(k, initialdata[k])
 
     def __getitem__(self, key: Hashable) -> Any:
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
             return getattr(self, key)
-        return getattr(self, '__data__')[key]
+        return getattr(self, '__x_attrs__')[key]
 
     def __setitem__(self, key: Hashable, value: Any):
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
             setattr(self, key, value)
         else:
-            getattr(self, '__data__')[key] = value
+            getattr(self, '__x_attrs__')[key] = value
 
     def __delitem__(self, key: Hashable):
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
             delattr(self, key)
         else:
-            del getattr(self, '__data__')[key]
+            del getattr(self, '__x_attrs__')[key]
 
-    def __call__(self, key: Hashable, default: Any = DEFAULT_ARGUMENT_VALUE) -> Any:
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PATTERN, key):
-            if default == DEFAULT_ARGUMENT_VALUE:
+    def __call__(self, key: Hashable, default: Any = DEFAULT_VALUE) -> Any:
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
+            if default == DEFAULT_VALUE:
                 return getattr(self, key)
             else:
                 return getattr(self, key, default)
         else:
-            if default == DEFAULT_ARGUMENT_VALUE:
-                return getattr(self, '__data__')[key]
+            if default == DEFAULT_VALUE:
+                return getattr(self, '__x_attrs__')[key]
             else:
-                return getattr(self, '__data__').get(key, default)
+                return getattr(self, '__x_attrs__').get(key, default)
 
     def __contains__(self, key: Hashable) -> bool:
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
             return hasattr(self, key)
         else:
-            return key in getattr(self, '__data__')
+            return key in getattr(self, '__x_attrs__')
 
     def __iter__(self) -> Iterator[Hashable]:
         return chain(
             (
                 name for name in dir(self)
-                if name.isidentifier() and not re.match(INTERNAL_NAME_PATTERN, name)
+                if name.isidentifier() and not re.match(INTERNAL_PATTERN, name)
             ),
-            getattr(self, '__data__'),
+            getattr(self, '__x_attrs__'),
         )
 
     def __len__(self) -> int:
@@ -153,9 +156,9 @@ def merge(this: IndexableObject, other: Union[IndexableObject, Mapping]) -> Inde
 def to_dict(obj):
     if isinstance(obj, Mapping):
         return {k: to_dict(v) for k, v in obj.items()}
-    elif isinstance(obj, Sequence) and not isinstance(obj, INDEXABLE_SCALAR_TYPES):
+    elif isinstance(obj, Iterable) and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
         return [to_dict(i) for i in obj]
-    elif hasattr(obj, '__getitem__') and not isinstance(obj, INDEXABLE_SCALAR_TYPES):
+    elif hasattr(obj, '__getitem__') and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
         return {k: to_dict(obj[k]) for k in obj}
     else:
         return obj
@@ -164,9 +167,9 @@ def to_dict(obj):
 def from_dict(obj):
     if isinstance(obj, Mapping):
         return IndexableObject({k: from_dict(v) for k, v in obj.items()})
-    elif isinstance(obj, Sequence) and not isinstance(obj, INDEXABLE_SCALAR_TYPES):
+    elif isinstance(obj, Iterable) and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
         return [from_dict(i) for i in obj]
-    elif hasattr(obj, '__getitem__') and not isinstance(obj, INDEXABLE_SCALAR_TYPES):
+    elif hasattr(obj, '__getitem__') and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
         return IndexableObject({k: from_dict(obj[k]) for k in obj})
     else:
         return obj
