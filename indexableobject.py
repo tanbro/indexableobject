@@ -6,9 +6,9 @@ from typing import Any, Hashable, Iterable, Iterator, Mapping, Union
 __all__ = ['IndexableObject', 'to_dict', 'update', 'merge', 'from_dict']
 
 
-DEFAULT_VALUE = object()
-INTERNAL_PATTERN = re.compile(r'_{2}\S+_{2}')
-SCALAR_SEQUENCE_TYPES = str, bytes, bytearray, memoryview
+DEFAULT_ARG = object()
+INTERNAL_NAME_PAT = re.compile(r'_{2}\S+_{2}')
+ITERABLE_SCALAR_TYPES = str, bytes, bytearray, memoryview
 
 
 class IndexableObject:
@@ -50,36 +50,36 @@ class IndexableObject:
                 self.__setitem__(k, initialdata[k])
 
     def __getitem__(self, key: Hashable) -> Any:
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PAT, key):
             return getattr(self, key)
         return getattr(self, '__x_attrs__')[key]
 
     def __setitem__(self, key: Hashable, value: Any):
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PAT, key):
             setattr(self, key, value)
         else:
             getattr(self, '__x_attrs__')[key] = value
 
     def __delitem__(self, key: Hashable):
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PAT, key):
             delattr(self, key)
         else:
             del getattr(self, '__x_attrs__')[key]
 
-    def __call__(self, key: Hashable, default: Any = DEFAULT_VALUE) -> Any:
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
-            if default == DEFAULT_VALUE:
+    def __call__(self, key: Hashable, default: Any = DEFAULT_ARG) -> Any:
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PAT, key):
+            if default == DEFAULT_ARG:
                 return getattr(self, key)
             else:
                 return getattr(self, key, default)
         else:
-            if default == DEFAULT_VALUE:
+            if default == DEFAULT_ARG:
                 return getattr(self, '__x_attrs__')[key]
             else:
                 return getattr(self, '__x_attrs__').get(key, default)
 
     def __contains__(self, key: Hashable) -> bool:
-        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_PATTERN, key):
+        if isinstance(key, str) and key.isidentifier() and not re.match(INTERNAL_NAME_PAT, key):
             return hasattr(self, key)
         else:
             return key in getattr(self, '__x_attrs__')
@@ -88,7 +88,7 @@ class IndexableObject:
         return chain(
             (
                 name for name in dir(self)
-                if name.isidentifier() and not re.match(INTERNAL_PATTERN, name)
+                if name.isidentifier() and not re.match(INTERNAL_NAME_PAT, name)
             ),
             getattr(self, '__x_attrs__'),
         )
@@ -154,22 +154,20 @@ def merge(this: IndexableObject, other: Union[IndexableObject, Mapping]) -> Inde
 
 
 def to_dict(obj):
+    if isinstance(obj, IndexableObject):
+        return {k: to_dict(obj[k]) for k in obj}
     if isinstance(obj, Mapping):
         return {k: to_dict(v) for k, v in obj.items()}
-    elif isinstance(obj, Iterable) and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
+    if isinstance(obj, Iterable) and not isinstance(obj, ITERABLE_SCALAR_TYPES):
         return [to_dict(i) for i in obj]
-    elif hasattr(obj, '__getitem__') and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
-        return {k: to_dict(obj[k]) for k in obj}
-    else:
-        return obj
+    return obj
 
 
 def from_dict(obj):
+    if isinstance(obj, IndexableObject):
+        return IndexableObject({k: from_dict(obj[k]) for k in obj})
     if isinstance(obj, Mapping):
         return IndexableObject({k: from_dict(v) for k, v in obj.items()})
-    elif isinstance(obj, Iterable) and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
+    if isinstance(obj, Iterable) and not isinstance(obj, ITERABLE_SCALAR_TYPES):
         return [from_dict(i) for i in obj]
-    elif hasattr(obj, '__getitem__') and not isinstance(obj, SCALAR_SEQUENCE_TYPES):
-        return IndexableObject({k: from_dict(obj[k]) for k in obj})
-    else:
-        return obj
+    return obj

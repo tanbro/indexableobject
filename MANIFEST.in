@@ -1,0 +1,10 @@
+exclude .git*
+exclude .*
+exclude readthedocs.yml
+exclude sonar-project.properties
+
+prune .*
+prune docs
+prune tests
+prune notebooks
+prune *.git*
